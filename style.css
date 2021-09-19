@@ -1,0 +1,26 @@
+* {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+}
+body {
+    background-color: rgba( 22, 22, 22, 1 );
+}
+canvas::before {
+    content: '';
+    display: block;
+    position: absolute;
+    background: radial-gradient(circle, rgba(0,0,0,.1) 0%, rgba(0,0,0,.1) 50%, rgba(0,0,0,.3) 100%);
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+}
+
+canvas {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+}
