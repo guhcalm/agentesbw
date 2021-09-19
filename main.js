@@ -10,7 +10,7 @@ let malha   = { x: 10, y: 10, z: 10 }
 let malhas  = { octaves, malha }
 let quantidade = 800
 let raio = .15
-let velocidade = .05
+let velocidade = .1
 
 let cena
 
