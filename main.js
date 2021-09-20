@@ -6,12 +6,11 @@ let canvas  = document.querySelector( 'canvas' )
 let w       = ( canvas.width = window.innerWidth )
 let h       = ( canvas.height = window.innerHeight )
 let octaves = { x: 1, y: 1, z: 1 }
-let malha   = { x: 10, y: 10, z: 10 }
+let malha   = { x: 15, y: 15, z: 15 }
 let malhas  = { octaves, malha }
-let quantidade = 800
-let raio = .15
-let velocidade = .1
-
+let quantidade = 500
+let raio = .3
+let velocidade = .2
 let cena
 
 function criarAmbiente( canvas ) {
@@ -37,20 +36,59 @@ function criarCamera( canvas, cena ) {
 }
 function criarLuz( cena ) {
     let light = new THREE.HemisphereLight(0xffffff, 0xffffff, .5)
-  
-    let shadowLight = new THREE.DirectionalLight(0xffffff, .8);
-    shadowLight.position.set(200, 200, 200);
-    shadowLight.castShadow = true;
-    shadowLight.shadowDarkness = .2;
-        
-    let backLight = new THREE.DirectionalLight(0xffffff, .4);
-    backLight.position.set(-100, 200, 50);
-    backLight.shadowDarkness = .2;
+         
+    let backLight = new THREE.DirectionalLight(0xffffff, .2);
+    backLight.position.set(-10, 20, 50);
     backLight.castShadow = true;
-        
+
+    let lightProbe = new THREE.LightProbe();
+
+    const dirLight = new THREE.DirectionalLight( 'white', .2 );
+    dirLight.position.set(10, 10, 10);
+    dirLight.castShadow = true;
+    dirLight.shadow.camera.top = 2;
+    dirLight.shadow.camera.bottom = - 2;
+    dirLight.shadow.camera.left = - 2;
+    dirLight.shadow.camera.right = 2;
+    dirLight.shadow.camera.near = 0.1;
+    dirLight.shadow.camera.far = 40;
+
+    const light2 = new THREE.PointLight( 0xff2200, 0.2 );
+	light2.position.set( - 100, - 100, - 100 );
+	cena.add( light2 )
+
+    addShadowedLight( 1, 1, 1, 0xffffff, .1 )
+    addShadowedLight( 0.5, 1, - 1, 0xffffff, .5 )
+
+
+    function addShadowedLight( x, y, z, color, intensity ) {
+
+        const directionalLight = new THREE.DirectionalLight( color, intensity );
+        directionalLight.position.set( x, y, z );
+        cena.add( directionalLight );
+    
+        directionalLight.castShadow = true;
+    
+        const d = 1;
+        directionalLight.shadow.camera.left = - d;
+        directionalLight.shadow.camera.right = d;
+        directionalLight.shadow.camera.top = d;
+        directionalLight.shadow.camera.bottom = - d;
+    
+        directionalLight.shadow.camera.near = 1;
+        directionalLight.shadow.camera.far = 4;
+    
+        directionalLight.shadow.mapSize.width = 1024;
+        directionalLight.shadow.mapSize.height = 1024;
+    
+        directionalLight.shadow.bias = - 0.001;
+    
+    }
+
+    cena.add(dirLight);    
+    cena.add(lightProbe );    
     cena.add(backLight);
     cena.add(light);
-    cena.add(shadowLight);
 }
 function criarRenderizador(canvas) {
     let render = new THREE.WebGLRenderer( { canvas, antialias: true } )
@@ -62,7 +100,7 @@ function criarRenderizador(canvas) {
 function init( canvas, malhas ) {
     let ambiente = criarAmbiente( canvas ) // {cena,camera,render}
     let malha = criarMalha(malhas)         // {unidades, intervalo, contorno}
-    
+    let time = 0
     //OrbitControl
     const controls = new OrbitControls(ambiente.camera, canvas);
     controls.autoRotate = true;
@@ -73,12 +111,17 @@ function init( canvas, malhas ) {
     controls.target.set(malha.contorno.x/2, malha.contorno.y/2, malha.contorno.y/2)
     ambiente.camera.position.set( malha.contorno.x/2, malha.contorno.y/2, 20 )
 
-    let campo = criarCampo( malha )
+    let campo = criarCampo( malha, time )
     desenharCampo(ambiente, campo)
     let life = criarParticulas( ambiente, malha, quantidade )
     loop()
     function loop() {
+        time += .01
+        campo = criarCampo( malha, time )
         move( ambiente, malha, campo, life )
+        if ( time <= 150 ) {
+            
+        }
         requestAnimationFrame(loop)
         ambiente.render.render( ambiente.cena, ambiente.camera )
     }
@@ -95,7 +138,7 @@ function criarMalha(malhas) {
     }  
     return { unidades, intervalo, contorno }
 }
-function criarCampo(malha) {
+function criarCampo(malha, tempo) {
     let intervalo = malha.intervalo
     let unidades = malha.unidades
     let campo = [ new Array( unidades.x ) ]
@@ -109,7 +152,7 @@ function criarCampo(malha) {
         let zi = z * intervalo.z
         
         let pos = { x: xi, y: yi, z: zi }
-        let noise = Noise( xi/unidades.x, yi/unidades.y, zi/unidades.z )
+        let noise = Noise( xi/unidades.x + tempo, yi/unidades.y + tempo, zi/unidades.z + tempo )
 
         let comprimento = malha.intervalo.x * noise
         let angulo = 2 * Math.PI * noise
@@ -159,23 +202,49 @@ function criarParticulas( ambiente, malha, quantidade ) {
     return life
 }
 function desenharParticula(pos, size) {
-    let geometry = new THREE.SphereGeometry( size, 5, 5 )
+    let geometry = new THREE.SphereGeometry( size, 15, 15 )
     let material = new THREE.MeshLambertMaterial({color:'rgba(255,255,255,1)', opacity: 1, flatShading: true, transparent: true })
-    let particula = new THREE.Mesh( geometry, material )
+
+    let baseMaterial = new THREE.MeshPhysicalMaterial({
+        color: 'rgba(255,255,255,1)',
+        wireframe: false,
+        metalness: 0,
+        roughness: 0,
+        transparent: true,
+        reflectivity: 1,
+        refractionRatio: 1
+    })
+
+    let particula = new THREE.Mesh( geometry, baseMaterial )
     particula.position.set( pos.x, pos.y, pos.z )
     return particula
 }
-
+function criarVetor( cena, points, color, opacity ) {
+    let material = new THREE.LineBasicMaterial( {
+        color: color,
+        linewidth: .1,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        opacity: opacity
+    } )
+    let geometria = new THREE.BufferGeometry().setFromPoints( points )
+    let vetor = new THREE.LineSegments( geometria, material )
+    cena.add( vetor )
+    return vetor
+}
 function move( ambiente, malha, campo, life ) {
-    let group = ambiente.cena.children[5]
+    let group = ambiente.cena.children[9]
     let particulas = group.children
     console.log()
     let r = Math.random()
     let index = 0
     particulas.forEach( p => {
-        life[index] -= .001
+        life[index] -= .01
         //console.log(pos)
         let pos = p.position
+        
+        let history = pos
+
         let v = {
             x: Math.round(pos.x / malha.intervalo.x),
             y: Math.round(pos.y / malha.intervalo.y),
@@ -200,11 +269,19 @@ function move( ambiente, malha, campo, life ) {
         color.g = noise
         color.b = noise
 
-        p.material.opacity = noise
+        let opacity = (p.material.opacity = noise)
 
         pos.x += vel.x * velocidade
         pos.y += vel.y * velocidade
         pos.z += vel.z * velocidade
+
+        let points = []
+        points.push( 
+            {x:pos.x - vel.x * velocidade, y:pos.y - vel.y * velocidade, z:pos.z - vel.z * velocidade}, 
+            {x:pos.x, y:pos.y, z:pos.z}
+            )
+        
+        //let vetor = criarVetor( ambiente.cena, points, color, opacity )
 
         if ( pos.x >= malha.contorno.x || 
              pos.y >= malha.contorno.y ||
